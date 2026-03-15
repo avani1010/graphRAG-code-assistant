@@ -1,9 +1,3 @@
-"""
-Ultra-Simplified Universal Multi-Language Code Parser
-Only FILES (no modules) - 3 relationships: CONTAINS, CALLS, IMPORTS
-Works with ANY tree-sitter supported language (40+)
-"""
-
 from tree_sitter import Parser
 from tree_sitter_language_pack import get_language
 from pathlib import Path
