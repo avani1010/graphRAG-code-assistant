@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  # Neo4j database (only needed for local development)
+  # Comment out if using Neo4j Aura
+#  neo4j:
+#    image: neo4j:5.15
+#    container_name: graphrag-neo4j
+#    ports:
+#      - "7474:7474"  # HTTP
+#      - "7687:7687"  # Bolt
+#    environment:
+#      - NEO4J_AUTH=neo4j/localpassword
+#      - NEO4J_PLUGINS=["apoc"]
+#    volumes:
+#      - neo4j_data:/data
+#      - neo4j_logs:/logs
+#    healthcheck:
+#      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider localhost:7474 || exit 1"]
+#      interval: 10s
+#      timeout: 5s
+#      retries: 5
+#    profiles:
+#      - local  # Only runs when you specify --profile local
+
+  # Parser application
+  parser:
+    build: .
+    container_name: graphrag-parser
+    environment:
+      # These are loaded from your .env file automatically
+      - NEO4J_URI=${NEO4J_URI}
+      - NEO4J_USERNAME=${NEO4J_USERNAME}
+      - NEO4J_PASSWORD=${NEO4J_PASSWORD}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}  # Optional, for future LLM use
+    volumes:
+      - ./temp_repo:/app/temp_repo  # Persist cloned repos
+    command: python main.py ${REPO_URL:-https://github.com/miguelgrinberg/react-flask-app}
+
+volumes:
+  neo4j_data:
+  neo4j_logs:

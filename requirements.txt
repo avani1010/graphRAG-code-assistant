@@ -1,0 +1,8 @@
+git-utils==0.0.1
+neo4j==6.1.0
+pytz==2026.1.post1
+tree-sitter==0.25.2
+tree-sitter-c-sharp==0.23.1
+tree-sitter-embedded-template==0.25.0
+tree-sitter-language-pack==0.13.0
+tree-sitter-yaml==0.7.2
