@@ -1,8 +1,3 @@
-"""
-Neo4j database operations
-Updated for universal parser with multiple entity types and relationships
-"""
-
 from neo4j import GraphDatabase
 import logging
 
