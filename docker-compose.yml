@@ -35,6 +35,7 @@ services:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}  # Optional, for future LLM use
     volumes:
       - ./temp_repo:/app/temp_repo  # Persist cloned repos
+#    command: python example-queries.py
     command: python main.py ${REPO_URL:-https://github.com/miguelgrinberg/react-flask-app}
 
 volumes:

@@ -75,13 +75,16 @@ GLOBAL_NAMES = {
     # JavaScript/TypeScript globals
     'console', 'window', 'document', 'navigator', 'process', 'global',
     'module', 'exports', 'require', 'setTimeout', 'setInterval',
-    'localStorage', 'sessionStorage', 'fetch', 'URL', 'Promise',
+    'localStorage', 'sessionStorage', 'fetch', 'URL', 'Promise', 'time',
     # Python builtins
     'print', 'len', 'str', 'int', 'list', 'dict', 'set', 'tuple',
     'open', 'range', 'map', 'filter', 'sum', 'max', 'min', 'sorted',
     'enumerate', 'zip', 'all', 'any', 'isinstance', 'type',
     # Common test/boilerplate
     'describe', 'it', 'test', 'expect', 'beforeEach', 'afterEach',
+    'response', 'error', 'data', 'result', 'value',
+    'req', 'res', 'err', 'callback', 'options', 'then','json'
+    'config', 'params', 'props', 'state', 'event', 'len', 'print','log'
 }
 
 
@@ -370,7 +373,9 @@ def _extract_call(node, code, caller_full_name, result):
 
     if not callee or callee.lower() in GLOBAL_NAMES:
         return
-
+    caller_name = caller_full_name.split('::')[-1].split('.')[-1]
+    if callee == caller_name:
+        return
     # CALLS: function -> function
     result['relationships']['CALLS'].append({
         'from': caller_full_name,

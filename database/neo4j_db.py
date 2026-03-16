@@ -23,25 +23,17 @@ class Neo4jGraph:
 
             # Test connection
             self.driver.verify_connectivity()
-            logger.info(f"✓ Connected to Neo4j at {uri}")
+            logger.info(f"Connected to Neo4j at {uri}")
 
         except Exception as e:
-            logger.error(f"✗ Failed to connect to Neo4j: {e}")
+            logger.error(f"Failed to connect to Neo4j: {e}")
             raise
 
     def close(self):
         """Close database connection"""
         if self.driver:
             self.driver.close()
-            logger.info("✓ Database connection closed")
-
-    def __enter__(self):
-        """Context manager entry"""
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        """Context manager exit - auto cleanup"""
-        self.close()
+            print("Database connection closed")
 
     def _get_session(self):
         """Get session with database if specified"""
@@ -50,10 +42,10 @@ class Neo4jGraph:
         return self.driver.session()
 
     def clear_database(self):
-        """Clear all nodes and relationships (use carefully!)"""
+        """Clear all nodes and relationships"""
         with self._get_session() as session:
             session.run("MATCH (n) DETACH DELETE n")
-            logger.info("✓ Database cleared")
+            print("Database cleared")
 
     def create_entity(self, entity_type, entity_data):
         """
@@ -106,78 +98,8 @@ class Neo4jGraph:
 
             session.run(query, **entity_data)
 
-    def create_relationship(self, rel_type, rel_data):
-        """
-        Universal relationship creator - handles all relationship types
-
-        Args:
-            rel_type: Type of relationship (CONTAINS, DECLARES, CALLS, etc.)
-            rel_data: Dictionary with 'from', 'from_type', 'to', 'to_type'
-        """
-        with self._get_session() as session:
-            # Map type names to Neo4j labels
-            label_map = {
-                'file': 'File',
-                'directory': 'Directory',
-                'class': 'Class',
-                'function': 'Function',
-                'method': 'Method',
-                'struct': 'Class',  # Treat structs as classes
-            }
-
-            from_label = label_map.get(rel_data['from_type'], rel_data['from_type'].capitalize())
-            to_label = label_map.get(rel_data['to_type'], rel_data['to_type'].capitalize())
-
-            from_identifier = rel_data['from']
-            to_identifier = rel_data['to']
-
-            # Determine match criteria based on what we're linking
-            # Files and directories match on path
-            # Classes, functions, methods match on full_name
-            # Modules, variables match on name
-
-            from_match = self._get_match_clause(from_label, from_identifier)
-            to_match = self._get_match_clause(to_label, to_identifier)
-
-            query = f"""
-                MATCH {from_match}
-                MERGE {to_match}
-                MERGE (from)-[:{rel_type}]->(to)
-            """
-
-            try:
-                session.run(query)
-            except Exception as e:
-                # Log but don't fail on relationship creation errors
-                logger.warning(f"Failed to create {rel_type} relationship from {from_identifier} to {to_identifier}: {e}")
-
     def _get_match_clause(self, label, identifier):
-        """
-        Get the appropriate MATCH clause based on label type
-
-        Args:
-            label: Neo4j label
-            identifier: The identifier value
-
-        Returns:
-            MATCH clause string
-        """
-        # Files and directories use 'path'
-        if label in ['File', 'Directory']:
-            return f"(from:{label} {{path: '{identifier}'}})" if label == label else f"(to:{label} {{path: '{identifier}'}})"
-
-        # Classes, Functions, Methods use 'full_name'
-        elif label in ['Class', 'Interface', 'Function', 'Method']:
-            identifier_escaped = identifier.replace("'", "\\'")
-            return f"(from:{label} {{full_name: '{identifier_escaped}'}})" if 'from' in str(label) else f"(to:{label} {{full_name: '{identifier_escaped}'}})"
-
-        # Everything else uses 'name'
-        else:
-            identifier_escaped = identifier.replace("'", "\\'")
-            return f"(from:{label} {{name: '{identifier_escaped}'}})" if 'from' in str(label) else f"(to:{label} {{name: '{identifier_escaped}'}})"
-
-    def _get_match_clause(self, label, identifier):
-        """Helper to generate MATCH clause - fixed version"""
+        """Helper to generate MATCH clause"""
         identifier_escaped = identifier.replace("'", "\\'")
 
         if label in ['File', 'Directory']:
@@ -189,40 +111,42 @@ class Neo4jGraph:
 
     def create_relationship(self, rel_type, rel_data):
         """
-        Universal relationship creator - handles all relationship types (FIXED)
+        Universal relationship creator - handles all relationship types
 
         Args:
-            rel_type: Type of relationship (CONTAINS, DECLARES, CALLS, etc.)
+            rel_type: Type of relationship (CONTAINS, CALLS)
             rel_data: Dictionary with 'from', 'from_type', 'to', 'to_type'
         """
         with self._get_session() as session:
-            # Map type names to Neo4j labels
             label_map = {
                 'file': 'File',
                 'directory': 'Directory',
-                'module': 'Module',
                 'class': 'Class',
-                'interface': 'Interface',
                 'function': 'Function',
                 'method': 'Method',
-                'variable': 'Variable',
-                'constant': 'Constant',
-                'struct': 'Class',
-                'exported_entity': 'ExportedEntity',
-                'decorator': 'Decorator',
             }
 
             from_label = label_map.get(rel_data['from_type'], rel_data['from_type'].capitalize())
             to_label = label_map.get(rel_data['to_type'], rel_data['to_type'].capitalize())
 
             from_match = self._get_match_clause(from_label, rel_data['from'])
-            to_match = self._get_match_clause(to_label, rel_data['to'])
 
-            query = f"""
-                MATCH (from:{from_label} {from_match})
-                MERGE (to:{to_label} {to_match})
-                MERGE (from)-[:{rel_type}]->(to)
-            """
+            # Special handling for CALLS - match target by name only
+            if rel_type == 'CALLS':
+                to_identifier = rel_data['to'].replace("'", "\\'")
+                query = f"""
+                    MATCH (from:{from_label} {from_match})
+                    MATCH (to:{to_label} {{name: '{to_identifier}'}})
+                    MERGE (from)-[:{rel_type}]->(to)
+                """
+            else:
+                # For CONTAINS, use normal match
+                to_match = self._get_match_clause(to_label, rel_data['to'])
+                query = f"""
+                    MATCH (from:{from_label} {from_match})
+                    MERGE (to:{to_label} {to_match})
+                    MERGE (from)-[:{rel_type}]->(to)
+                """
 
             try:
                 session.run(query)

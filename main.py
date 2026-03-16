@@ -21,7 +21,7 @@ def should_skip_file(filename):
     return False
 
 
-def parse_repository_to_neo4j(repo_url, target_dir="./temp_repo", clear_db=True):
+def parse_repository_to_neo4j(repo_url, target_dir="./temp_repo", clear_db=False):
     """
     Clone a GitHub repository, parse it, and store in Neo4j
 
@@ -32,7 +32,7 @@ def parse_repository_to_neo4j(repo_url, target_dir="./temp_repo", clear_db=True)
     """
 
     print("="*60)
-    print("GitHub Repository → Neo4j Graph Parser")
+    print("GitHub Repository -> Neo4j Graph Parser")
     print("Simplified: 3 Relationships (CONTAINS, CALLS, IMPORTS)")
     print("="*60)
 
@@ -48,7 +48,7 @@ def parse_repository_to_neo4j(repo_url, target_dir="./temp_repo", clear_db=True)
     code_files = [(rel, lang, full) for rel, lang, full in all_files
                   if not should_skip_file(Path(rel).name)]
 
-    print(f"✓ Found {len(code_files)} code files ({len(all_files) - len(code_files)} skipped)")
+    print(f"Found {len(code_files)} code files ({len(all_files) - len(code_files)} skipped)")
 
     # Step 3: Connect to Neo4j
     print("\n[3/4] Connecting to Neo4j...")
@@ -99,9 +99,7 @@ def parse_repository_to_neo4j(repo_url, target_dir="./temp_repo", clear_db=True)
             print(f"    ✗ Error: {e}")
 
     # Print results
-    print("\n" + "="*60)
-    print("✓ Parsing Complete!")
-    print("="*60)
+    print("Parsing Complete!")
 
     print("\nEntities inserted:")
     for entity_type, count in stats.items():
@@ -127,7 +125,7 @@ def parse_repository_to_neo4j(repo_url, target_dir="./temp_repo", clear_db=True)
     print(f"\n  Total relationships: {total_relationships}")
 
     db.close()
-    print("\n✓ Done!")
+    print("\nDone!")
 
 
 if __name__ == "__main__":
