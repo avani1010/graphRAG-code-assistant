@@ -18,15 +18,10 @@ COPY utils/ ./utils/
 COPY parser/ ./parser/
 COPY database/ ./database/
 COPY main.py .
-COPY query.py .
-COPY example-queries.py .
-
-#RUN mkdir -p temp_repo
 
 
 RUN useradd -m -u 1000 appuser && \
     chown -R appuser:appuser /app
 USER appuser
 
-#CMD ["python", "example-queries.py"]
 CMD ["python", "main.py"]
