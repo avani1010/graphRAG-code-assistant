@@ -20,8 +20,7 @@ class JavaParser:
                 'classes': [],
                 'methods': [],
                 'interfaces': [],
-                'exceptions': set(),
-                'annotations': set()
+                'exceptions': set()
             },
             'relationships': {
                 'CONTAINS': [],
@@ -29,8 +28,7 @@ class JavaParser:
                 'THROWS': [],
                 'CATCHES': [],
                 'INHERITS': [],
-                'IMPLEMENTS': [],
-                'ANNOTATES': []
+                'IMPLEMENTS': []
             }
         }
 
@@ -121,10 +119,6 @@ class JavaParser:
 
         result['entities']['classes'].append(class_info)
 
-        # Add annotations to entities
-        for ann in class_info['annotations']:
-            result['entities']['annotations'].add(ann)
-
         # Create relationships
         # File CONTAINS Class
         result['relationships']['CONTAINS'].append({
@@ -150,15 +144,6 @@ class JavaParser:
                 'from_type': 'class',
                 'to': interface,
                 'to_type': 'interface'
-            })
-
-        # Class ANNOTATES (annotations on class)
-        for ann in class_info['annotations']:
-            result['relationships']['ANNOTATES'].append({
-                'from': ann,
-                'from_type': 'annotation',
-                'to': class_info['full_name'],
-                'to_type': 'class'
             })
 
         # Extract methods in this class
@@ -281,16 +266,6 @@ class JavaParser:
                 'to': call,
                 'to_type': 'method'
             })
-
-        # Annotation ANNOTATES Method
-        for ann in method_info['annotations']:
-            result['relationships']['ANNOTATES'].append({
-                'from': ann,
-                'from_type': 'annotation',
-                'to': method_info['full_name'],
-                'to_type': 'method'
-            })
-            result['entities']['annotations'].add(ann)
 
     def _extract_modifiers(self, modifiers_node, code, info_dict):
         """Extract modifiers (public, private, static, annotations, etc.)"""

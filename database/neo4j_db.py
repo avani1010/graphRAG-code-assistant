@@ -1,27 +1,10 @@
-"""
-Enhanced Neo4j Database Handler
-Supports multi-repo entities and relationships
-"""
-
 from neo4j import GraphDatabase
 import logging
-
 logger = logging.getLogger(__name__)
 
 
 class Neo4jGraph:
-    """Neo4j graph database handler with multi-repo support"""
-
     def __init__(self, uri, user, password, database=None):
-        """
-        Initialize Neo4j connection
-
-        Args:
-            uri: Neo4j URI
-            user: Username
-            password: Password
-            database: Database name (None for default)
-        """
         try:
             self.driver = GraphDatabase.driver(uri, auth=(user, password))
             self.database = database
@@ -61,46 +44,63 @@ class Neo4jGraph:
         label_map = {
             'repositories': 'Repository',
             'files': 'File',
+            'modules': 'Module',
             'classes': 'Class',
             'interfaces': 'Interface',
+            'functions': 'Function',
             'methods': 'Method',
             'exceptions': 'Exception',
-            'annotations': 'Annotation',
+            'decorators': 'Decorator'
         }
 
         label = label_map.get(entity_type, entity_type.capitalize())
 
         with self._get_session() as session:
-            # Build SET clause for all properties
-            set_clauses = ', '.join([f"n.{key} = ${key}" for key in entity_data.keys()])
+            try:
+                # Clean entity_data - ensure all values are Neo4j-compatible
+                clean_data = {}
+                for key, value in entity_data.items():
+                    if value is None:
+                        clean_data[key] = None
+                    elif isinstance(value, (str, int, float, bool)):
+                        clean_data[key] = value
+                    elif isinstance(value, list):
+                        # Neo4j accepts arrays of primitives
+                        clean_data[key] = value
+                    else:
+                        # Convert anything else to string
+                        clean_data[key] = str(value)
 
-            # Use MERGE to avoid duplicates
-            if 'path' in entity_data:
-                # For files, use path as unique key
-                query = f"""
-                    MERGE (n:{label} {{path: $path}})
-                    SET {set_clauses}
-                """
-            elif 'full_name' in entity_data:
-                # For classes, methods - use full_name
-                query = f"""
-                    MERGE (n:{label} {{full_name: $full_name}})
-                    SET {set_clauses}
-                """
-            elif 'name' in entity_data:
-                # For repositories, exceptions, annotations - use name
-                query = f"""
-                    MERGE (n:{label} {{name: $name}})
-                    SET {set_clauses}
-                """
-            else:
-                # Fallback: just create
-                query = f"""
-                    CREATE (n:{label})
-                    SET {set_clauses}
-                """
+                # Build SET clause
+                set_clauses = ', '.join([f"n.{key} = ${key}" for key in clean_data.keys()])
 
-            session.run(query, **entity_data)
+                # Use MERGE to avoid duplicates
+                if 'path' in clean_data:
+                    query = f"""
+                        MERGE (n:{label} {{path: $path}})
+                        SET {set_clauses}
+                    """
+                elif 'full_name' in clean_data:
+                    query = f"""
+                        MERGE (n:{label} {{full_name: $full_name}})
+                        SET {set_clauses}
+                    """
+                elif 'name' in clean_data:
+                    query = f"""
+                        MERGE (n:{label} {{name: $name}})
+                        SET {set_clauses}
+                    """
+                else:
+                    query = f"""
+                        CREATE (n:{label})
+                        SET {set_clauses}
+                    """
+
+                session.run(query, **clean_data)
+            except Exception as e:
+                logger.error(f"Failed to create {label} entity: {e}")
+                logger.error(f"Entity data keys: {list(entity_data.keys())}")
+                raise
 
     def create_relationship(self, rel_type, rel_data):
         """
@@ -111,15 +111,16 @@ class Neo4jGraph:
             rel_data: Dictionary with 'from', 'from_type', 'to', 'to_type'
         """
         with self._get_session() as session:
-            # Map type names to Neo4j labels
             label_map = {
                 'repository': 'Repository',
                 'file': 'File',
+                'module': 'Module',
                 'class': 'Class',
                 'interface': 'Interface',
+                'function': 'Function',
                 'method': 'Method',
                 'exception': 'Exception',
-                'annotation': 'Annotation',
+                'decorator': 'Decorator'
             }
 
             from_label = label_map.get(rel_data['from_type'], rel_data['from_type'].capitalize())
@@ -128,7 +129,6 @@ class Neo4jGraph:
             from_match = self._get_match_clause(from_label, rel_data['from'])
             to_match = self._get_match_clause(to_label, rel_data['to'])
 
-            # Special handling for CALLS - only link existing methods
             if rel_type == 'CALLS':
                 query = f"""
                     MATCH (from:{from_label} {from_match})
@@ -136,7 +136,6 @@ class Neo4jGraph:
                     MERGE (from)-[:{rel_type}]->(to)
                 """
             else:
-                # For other relationships, create target if missing
                 query = f"""
                     MATCH (from:{from_label} {from_match})
                     MERGE (to:{to_label} {to_match})
@@ -154,8 +153,10 @@ class Neo4jGraph:
 
         if label in ['File']:
             return f"{{path: '{identifier_escaped}'}}"
-        elif label in ['Repository', 'Exception', 'Annotation']:
+        elif label in ['Repository', 'Exception', 'Decorator']:
             return f"{{name: '{identifier_escaped}'}}"
+        elif label in ['Module', 'Function']:
+            return f"{{full_name: '{identifier_escaped}'}}"
         elif label in ['Class', 'Interface', 'Method']:
             return f"{{full_name: '{identifier_escaped}'}}"
         else:
@@ -164,7 +165,6 @@ class Neo4jGraph:
     def get_stats(self):
         """Get database statistics"""
         with self._get_session() as session:
-            # Get node counts by label
             result = session.run("""
                 MATCH (n)
                 RETURN labels(n)[0] as type, count(*) as count
@@ -174,7 +174,6 @@ class Neo4jGraph:
             for record in result:
                 stats[record['type']] = record['count']
 
-            # Get relationship count
             rel_result = session.run("MATCH ()-[r]->() RETURN count(r) as count")
             stats['relationships'] = rel_result.single()['count']
 
